@@ -6,18 +6,23 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
 import top.ntutn.apadwallparper.ui.theme.APadWallparperTheme
 
 class MainActivity : ComponentActivity() {
+    val launcher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == RESULT_OK) {
+            // 处理结果
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -30,7 +35,7 @@ class MainActivity : ComponentActivity() {
                         Button(onClick = {
                             val intent = Intent()
                             intent.action = WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER
-                            startActivityForResult(intent, 0)
+                            launcher.launch(intent)
                         }) {
                             Text("设为壁纸")
                         }

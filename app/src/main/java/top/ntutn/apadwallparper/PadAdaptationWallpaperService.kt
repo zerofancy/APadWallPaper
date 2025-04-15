@@ -54,6 +54,7 @@ class PadAdaptationWallpaperService : WallpaperService() {
 
         override fun onCreate(surfaceHolder: SurfaceHolder?) {
             super.onCreate(surfaceHolder)
+            setOffsetNotificationsEnabled(false)
             scope = CoroutineScope(Dispatchers.Main.immediate)
             val filter = IntentFilter().also {
                 it.addAction(ACTION_WALLPAPER_UPDATE)

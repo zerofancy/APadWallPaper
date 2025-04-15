@@ -5,16 +5,15 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Bitmap
-import android.graphics.BlendMode
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.PorterDuff
-import android.graphics.Rect
 import android.graphics.drawable.Drawable
 import android.net.Uri
-import android.os.Build
 import android.service.wallpaper.WallpaperService
 import android.view.SurfaceHolder
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import com.bumptech.glide.Glide
 import com.bumptech.glide.request.target.CustomTarget
 import com.bumptech.glide.request.transition.Transition
@@ -25,7 +24,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
-import androidx.core.net.toUri
+import kotlin.math.max
 
 class PadAdaptationWallpaperService : WallpaperService() {
     companion object {
@@ -38,23 +37,8 @@ class PadAdaptationWallpaperService : WallpaperService() {
 
     inner class PadWallpaperEngine(private val context: Context) : Engine() {
         private var bitmapH: Bitmap? = null
-            set(value) {
-                field = value
-                if (value != null) {
-                    bitmapHRect.set(0, 0, value.width, value.height)
-                }
-            }
         private var bitmapV: Bitmap? = null
-            set(value) {
-                field = value
-                if (value != null) {
-                    bitmapVRect.set(0, 0, value.width, value.height)
-                }
-            }
 
-        private val bitmapHRect = Rect()
-        private val bitmapVRect = Rect()
-        private val drawingRect = Rect()
         private val wallpaperChangeReceiver = object : BroadcastReceiver() {
             override fun onReceive(
                 context: Context?,
@@ -127,12 +111,6 @@ class PadAdaptationWallpaperService : WallpaperService() {
             height: Int
         ) {
             super.onSurfaceChanged(holder, format, width, height)
-//            if (width > height == desiredMinimumWidth > desiredMinimumHeight) {
-//                drawingRect.set(0, 0, desiredMinimumWidth, desiredMinimumHeight)
-//            } else {
-//                drawingRect.set(0, 0, desiredMinimumHeight, desiredMinimumWidth)
-//            }
-            drawingRect.set(0, 0, width, height) // fixme 壁纸拉伸问题解决
             refreshImage()
         }
 
@@ -160,35 +138,48 @@ class PadAdaptationWallpaperService : WallpaperService() {
         }
 
         private fun drawImage() {
-            if (!surfaceValid) {
-                return
-            }
-            if (bitmapV == null || bitmapH == null) {
-                return
-            }
+            if (!surfaceValid || bitmapV == null || bitmapH == null) return
+
             val holder = surfaceHolder ?: return
             val frameRect = holder.surfaceFrame
-            if (frameRect.let { it.width() <= 0 || it.height() <= 0 }) {
-                return
-            }
+            if (frameRect.width() <= 0 || frameRect.height() <= 0) return
 
-            val canvas = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                holder.lockHardwareCanvas()
-            } else {
-                holder.lockCanvas()
-            } ?: return
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                canvas.drawColor(Color.TRANSPARENT, BlendMode.CLEAR)
-            } else {
+            val canvas = holder.lockCanvas() ?: return
+            try {
+                // 清除画布
                 canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
+
+                // 选择目标位图
+                val targetBitmap = if (frameRect.width() > frameRect.height()) bitmapH else bitmapV
+                targetBitmap?.let { bitmap ->
+                    // 计算缩放比例
+                    val scale = max(
+                        frameRect.width().toFloat() / bitmap.width,
+                        frameRect.height().toFloat() / bitmap.height
+                    )
+
+                    // 计算缩放后的尺寸
+                    val scaledWidth = bitmap.width * scale
+                    val scaledHeight = bitmap.height * scale
+
+                    // 计算偏移量（居中显示）
+                    val dx = (frameRect.width() - scaledWidth) / 2
+                    val dy = (frameRect.height() - scaledHeight) / 2
+
+                    // 创建缩放矩阵
+                    val matrix = Matrix().apply {
+                        postScale(scale, scale)
+                        postTranslate(dx, dy)
+                    }
+
+                    // 绘制位图
+                    canvas.drawBitmap(bitmap, matrix, null)
+                }
+            } finally {
+                holder.unlockCanvasAndPost(canvas)
             }
-            if (frameRect.width() > frameRect.height()) {
-                bitmapH?.let { canvas.drawBitmap(it, bitmapHRect, drawingRect, null) }
-            } else {
-                bitmapV?.let { canvas.drawBitmap(it, bitmapVRect, drawingRect , null) }
-            }
-            holder.unlockCanvasAndPost(canvas)
         }
+
 
         override fun onDestroy() {
             scope.cancel()

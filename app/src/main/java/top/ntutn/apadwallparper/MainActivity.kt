@@ -1,8 +1,10 @@
 package top.ntutn.apadwallparper
 
 import android.app.WallpaperManager
+import android.content.ContentResolver
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -14,13 +16,34 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
+import com.tencent.mmkv.MMKV
 import top.ntutn.apadwallparper.ui.theme.APadWallparperTheme
 
 class MainActivity : ComponentActivity() {
-    val launcher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+    private val launcher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == RESULT_OK) {
             // 处理结果
         }
+    }
+
+    private val selectWallHLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { result ->
+        if (result == null) {
+            Toast.makeText(applicationContext, "No selected image", Toast.LENGTH_SHORT).show()
+            return@registerForActivityResult
+        }
+        contentResolver.takePersistableUriPermission(result, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        MMKV.defaultMMKV().encode(PadAdaptationWallpaperService.KEY_BITMAP_H_URI, result.toString())
+        sendBroadcast(Intent(PadAdaptationWallpaperService.ACTION_WALLPAPER_UPDATE))
+    }
+
+    private val selectWallVLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { result ->
+        if (result == null) {
+            Toast.makeText(applicationContext, "No selected image", Toast.LENGTH_SHORT).show()
+            return@registerForActivityResult
+        }
+        contentResolver.takePersistableUriPermission(result, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        MMKV.defaultMMKV().encode(PadAdaptationWallpaperService.KEY_BITMAP_V_URI, result.toString())
+        sendBroadcast(Intent(PadAdaptationWallpaperService.ACTION_WALLPAPER_UPDATE))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -33,12 +56,12 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.padding(innerPadding)
                     ) {
                         Button(onClick = {
-
+                            selectWallHLauncher.launch(arrayOf("image/*"))
                         }) {
                             Text("选择横屏壁纸")
                         }
                         Button(onClick = {
-
+                            selectWallVLauncher.launch(arrayOf("image/*"))
                         }) {
                             Text("选择竖屏壁纸")
                         }

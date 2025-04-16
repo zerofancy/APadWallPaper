@@ -51,7 +51,7 @@ dependencies {
     implementation(libs.androidx.material3)
 
     implementation(libs.glide)
-    implementation(libs.mmkv)
+    implementation(libs.androidx.datastore.preferences)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

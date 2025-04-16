@@ -1,9 +1,6 @@
 package top.ntutn.apadwallparper
 
-import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Matrix
@@ -12,12 +9,9 @@ import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.service.wallpaper.WallpaperService
 import android.view.SurfaceHolder
-import androidx.core.content.ContextCompat
-import androidx.core.net.toUri
 import com.bumptech.glide.Glide
 import com.bumptech.glide.request.target.CustomTarget
 import com.bumptech.glide.request.transition.Transition
-import com.tencent.mmkv.MMKV
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -27,26 +21,11 @@ import kotlin.coroutines.suspendCoroutine
 import kotlin.math.max
 
 class PadAdaptationWallpaperService : WallpaperService() {
-    companion object {
-        const val ACTION_WALLPAPER_UPDATE = "top.ntutn.apadwallparper.update"
-        const val KEY_BITMAP_H_URI = "bitmap_h_uri"
-        const val KEY_BITMAP_V_URI = "bitmap_v_uri"
-    }
-
     override fun onCreateEngine(): Engine? = PadWallpaperEngine(this)
 
     inner class PadWallpaperEngine(private val context: Context) : Engine() {
         private var bitmapH: Bitmap? = null
         private var bitmapV: Bitmap? = null
-
-        private val wallpaperChangeReceiver = object : BroadcastReceiver() {
-            override fun onReceive(
-                context: Context?,
-                intent: Intent?
-            ) {
-                refreshImage()
-            }
-        }
 
         @Volatile
         private var surfaceValid = false
@@ -56,15 +35,28 @@ class PadAdaptationWallpaperService : WallpaperService() {
             super.onCreate(surfaceHolder)
             setOffsetNotificationsEnabled(false)
             scope = CoroutineScope(Dispatchers.Main.immediate)
-            val filter = IntentFilter().also {
-                it.addAction(ACTION_WALLPAPER_UPDATE)
+            scope.launch {
+                WallPaperPreferences.getUriH(context)
+                    .collect {
+                        bitmapH = if (it == null) {
+                            loadBitmap(resourceCode = R.drawable.image_h)
+                        } else {
+                            loadBitmap(uri = it)
+                        }
+                        drawImage()
+                    }
             }
-            ContextCompat.registerReceiver(
-                context,
-                wallpaperChangeReceiver,
-                filter,
-                ContextCompat.RECEIVER_NOT_EXPORTED
-            )
+            scope.launch {
+                WallPaperPreferences.getUriV(context)
+                    .collect {
+                        bitmapV = if (it == null) {
+                            loadBitmap(resourceCode = R.drawable.image_v)
+                        } else {
+                            loadBitmap(uri = it)
+                        }
+                        drawImage()
+                    }
+            }
         }
 
         private suspend fun loadBitmap(resourceCode: Int? = null, uri: Uri? = null): Bitmap {
@@ -112,30 +104,12 @@ class PadAdaptationWallpaperService : WallpaperService() {
             height: Int
         ) {
             super.onSurfaceChanged(holder, format, width, height)
-            refreshImage()
+            drawImage()
         }
 
         override fun onDesiredSizeChanged(desiredWidth: Int, desiredHeight: Int) {
             super.onDesiredSizeChanged(desiredWidth, desiredHeight)
-            refreshImage()
-        }
-
-        private fun refreshImage() {
-            scope.launch {
-                val hUri = MMKV.defaultMMKV().decodeString(KEY_BITMAP_H_URI)
-                val vUri = MMKV.defaultMMKV().decodeString(KEY_BITMAP_V_URI)
-                bitmapH = if (hUri != null && hUri.isNotBlank()) {
-                    loadBitmap(uri = hUri.toUri())
-                } else {
-                    loadBitmap(resourceCode = R.drawable.image_h)
-                }
-                bitmapV = if (vUri != null && vUri.isNotBlank()) {
-                    loadBitmap(uri = vUri.toUri())
-                } else {
-                    loadBitmap(resourceCode = R.drawable.image_v)
-                }
-                drawImage()
-            }
+            drawImage()
         }
 
         private fun drawImage() {
@@ -185,7 +159,6 @@ class PadAdaptationWallpaperService : WallpaperService() {
         override fun onDestroy() {
             scope.cancel()
             surfaceValid = false
-            context.unregisterReceiver(wallpaperChangeReceiver)
             super.onDestroy()
         }
     }

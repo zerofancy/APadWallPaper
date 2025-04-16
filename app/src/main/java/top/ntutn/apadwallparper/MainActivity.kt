@@ -1,7 +1,6 @@
 package top.ntutn.apadwallparper
 
 import android.app.WallpaperManager
-import android.content.ContentResolver
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
@@ -16,7 +15,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
-import com.tencent.mmkv.MMKV
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import top.ntutn.apadwallparper.ui.theme.APadWallparperTheme
 
 class MainActivity : ComponentActivity() {
@@ -32,8 +32,9 @@ class MainActivity : ComponentActivity() {
             return@registerForActivityResult
         }
         contentResolver.takePersistableUriPermission(result, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        MMKV.defaultMMKV().encode(PadAdaptationWallpaperService.KEY_BITMAP_H_URI, result.toString())
-        sendBroadcast(Intent(PadAdaptationWallpaperService.ACTION_WALLPAPER_UPDATE))
+        lifecycleScope.launch {
+            WallPaperPreferences.updateUriH(this@MainActivity, result)
+        }
     }
 
     private val selectWallVLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { result ->
@@ -42,8 +43,9 @@ class MainActivity : ComponentActivity() {
             return@registerForActivityResult
         }
         contentResolver.takePersistableUriPermission(result, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        MMKV.defaultMMKV().encode(PadAdaptationWallpaperService.KEY_BITMAP_V_URI, result.toString())
-        sendBroadcast(Intent(PadAdaptationWallpaperService.ACTION_WALLPAPER_UPDATE))
+        lifecycleScope.launch {
+            WallPaperPreferences.updateUriV(this@MainActivity, result)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
